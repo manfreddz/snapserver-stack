@@ -1,0 +1,63 @@
+diff --git a/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnFeedHelper.java b/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnFeedHelper.java
+index 4d42dd4..a7eccfa 100644
+--- a/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnFeedHelper.java
++++ b/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnFeedHelper.java
+@@ -46,7 +46,16 @@ public final class CdnFeedHelper {
+ 
+     @NotNull
+     private static HttpUrl getUrl(@NotNull Session session, @NotNull StorageResolveResponse resp) {
+-        return HttpUrl.get(resp.getCdnurl(session.random().nextInt(resp.getCdnurlCount())));
++        String cdnurl = null;
++        for (int i = 0; i < 100; i++) {
++            cdnurl = resp.getCdnurl(session.random().nextInt(resp.getCdnurlCount()));
++            if (!cdnurl.contains("audio4-gm-fb.spotifycdn.com")) {
++                break;
++            } else {
++                LOGGER.warn("Skipping audio4-gm-fb.spotifycdn.com x {}", i+1);
++            }
++        }
++        return HttpUrl.get(cdnurl);
+     }
+ 
+     public static @NotNull LoadedStream loadTrack(@NotNull Session session, Metadata.@NotNull Track track, Metadata.@NotNull AudioFile file,
+diff --git a/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnManager.java b/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnManager.java
+index 4904b3c..f3d03cd 100644
+--- a/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnManager.java
++++ b/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnManager.java
+@@ -157,7 +157,11 @@ public class CdnManager {
+             this.url = url;
+ 
+             if (fileId != null) {
++                // Existing format: https://aud...bcf?__token__=exp=1697904087~hmac=80...99
+                 String tokenStr = url.queryParameter("__token__");
++                // New https://aud...bcf?Expires=1697904086~FullPath~hmac=fT...Q=
++                String expiresStr = url.queryParameter("Expires");
++
+                 if (tokenStr != null && !tokenStr.isEmpty()) {
+                     Long expireAt = null;
+                     String[] split = tokenStr.split("~");
+@@ -173,11 +177,23 @@ public class CdnManager {
+ 
+                     if (expireAt == null) {
+                         expiration = -1;
+-                        LOGGER.warn("Invalid __token__ in CDN url: " + url);
++                        LOGGER.warn("Invalid __token__ in CDN url: {}", url);
+                         return;
+                     }
+ 
+                     expiration = expireAt * 1000;
++                    LOGGER.info("__token__-based expiration {} ms", expiration);
++
++                } else if (expiresStr != null && !expiresStr.isEmpty()) {
++                    String expiresStrVal = expiresStr.split("~")[0];
++                    try {
++                        expiration = Long.parseLong(expiresStrVal) * 1000;
++                        LOGGER.info("Expires-based expiration {} ms", expiration);
++                    } catch (NumberFormatException e) {
++                        expiration = -1;
++                        LOGGER.warn("Invalid Expires param in CDN url: {}", url);
++                    }
++
+                 } else {
+                     String param = url.queryParameterName(0);
+                     int i = param.indexOf('_');

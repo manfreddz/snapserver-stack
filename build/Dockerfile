@@ -1,0 +1,158 @@
+# Build librespot
+FROM ubuntu:22.04 AS librespot-builder
+
+WORKDIR /code
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    git \
+    cargo \
+#    gstreamer1.0-plugins-base libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-good libgstreamer-plugins-good1.0-dev \
+    libasound2-dev libasound2-dev pkg-config portaudio19-dev libpulse-dev libjack-dev libjack-dev libsdl2-dev \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG LIBRESPOT_VERSION=0.4.1
+#COPY build_librespot.sh /
+#RUN /build_librespot.sh ${LIBRESPOT_VERSION}
+
+RUN git clone --branch v${LIBRESPOT_VERSION} --depth 1 https://github.com/librespot-org/librespot.git librespot-code
+WORKDIR librespot-code
+RUN git status
+RUN cargo build --release -Z sparse-registry
+
+
+# Build librespot-java
+FROM ubuntu:22.04 AS librespot-java-builder
+
+WORKDIR /code
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    git \
+    wget \
+    maven \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG LIBRESPOT_JAVA_VERSION=1.6.3
+#COPY build_librespot-java.sh /
+#RUN /build_librespot-java.sh ${LIBRESPOT_JAVA_VERSION}
+
+RUN wget "https://github.com/librespot-org/librespot-java/releases/download/v${LIBRESPOT_JAVA_VERSION}/librespot-player-${LIBRESPOT_JAVA_VERSION}.jar"
+RUN wget "https://github.com/librespot-org/librespot-java/releases/download/v${LIBRESPOT_JAVA_VERSION}/librespot-api-${LIBRESPOT_JAVA_VERSION}.jar"
+RUN mv librespot-player-${LIBRESPOT_JAVA_VERSION}.jar /librespot-player.jar
+
+RUN git clone --depth 1 --branch "v${LIBRESPOT_JAVA_VERSION}" https://github.com/librespot-org/librespot-java.git
+WORKDIR librespot-java
+RUN sed -i 's/<Console name="console" target="SYSTEM_OUT">/<Console name="console" target="SYSTEM_ERR">/' api/src/main/resources/log4j2.xml
+RUN sed -i 's/<Console name="console" target="SYSTEM_OUT">/<Console name="console" target="SYSTEM_ERR">/' lib/src/main/resources/log4j2.xml
+#RUN sed -i 's/if (output.setVolume(volumeNorm)) mixing.setGlobalGain(1);/volumeNorm = (float) Math.pow(volumeNorm, 3) \/ 2;\n        if (output.setVolume(volumeNorm)) mixing.setGlobalGain(1);/' player/src/main/java/xyz/gianlu/librespot/player/mixing/AudioSink.java
+RUN sed -i 's/if (output.setVolume(volumeNorm)) mixing.setGlobalGain(1);/volumeNorm = (float) Math.pow(volumeNorm, 3);\n        if (output.setVolume(volumeNorm)) mixing.setGlobalGain(1);/' player/src/main/java/xyz/gianlu/librespot/player/mixing/AudioSink.java
+
+#COPY allcerts.patch /
+#RUN git apply /allcerts.patch
+
+#COPY skip_audio4-gm-fb.patch /
+#RUN git apply /skip_audio4-gm-fb.patch
+
+COPY skip_audio4-gm-fb_and_cdnfix.patch /
+RUN git apply /skip_audio4-gm-fb_and_cdnfix.patch
+
+#COPY cdnfix.patch /
+#RUN git apply /cdnfix.patch
+
+RUN git diff
+
+RUN mvn clean package
+RUN cp ./player/target/librespot-player-${LIBRESPOT_JAVA_VERSION}*.jar /librespot-player.jar
+
+
+# Build snapcast
+FROM ubuntu:22.04 AS snapcast-builder
+
+WORKDIR /code
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    git \
+    make \
+    g++ \
+    libboost-all-dev \
+    libasound2-dev libpulse-dev libvorbisidec-dev libvorbis-dev libopus-dev libflac-dev libsoxr-dev alsa-utils libavahi-client-dev avahi-daemon libexpat1-dev \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG SNAPCAST_VERSION=0.27.0
+#COPY build_snapcast.sh /
+#RUN /build_snapcast.sh ${SNAPCAST_VERSION}
+
+RUN git clone --branch v${SNAPCAST_VERSION} --depth 1 https://github.com/badaix/snapcast.git snapcast
+WORKDIR snapcast
+RUN git status
+RUN make
+
+RUN find . -type f
+
+
+
+# Build actual image
+FROM ubuntu:22.04
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    libvorbis0a libvorbisenc2 \
+    libflac8 \
+    libopus0 \
+    libsoxr0 \
+    libasound2 \
+    libavahi-client3 \
+    libpulse0 \
+    nano \
+    less \
+    openjdk-17-jre-headless \
+    python3 python3-pip \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install websocket-client requests
+
+# Install librespot
+COPY --from=librespot-builder /code/librespot-code/target/release/librespot /usr/local/bin/
+
+# Install librespot-java
+COPY --from=librespot-java-builder /librespot-player.jar /librespot-player.jar
+COPY librespot-player.sh /librespot-player.sh
+
+# Install snapcast
+COPY --from=snapcast-builder /code/snapcast/server/snapserver /usr/bin/snapserver
+COPY --from=snapcast-builder /code/snapcast/client/snapclient /usr/bin/snapclient
+COPY --from=snapcast-builder /code/snapcast/server/etc/snapweb /usr/share/snapserver/snapweb
+
+RUN useradd --system --uid 666 -M --shell /usr/sbin/nologin snapcast && \
+    mkdir -p /home/snapcast/.config && \
+    chown snapcast:snapcast -R /home
+
+RUN mkdir -p /var/cache/snapcast/librespot && \
+    chown -R snapcast /var/cache/snapcast
+
+COPY config.toml /config.toml
+RUN chown 666:666 /config.toml
+
+USER snapcast
+
+EXPOSE 1704
+EXPOSE 1705
+
+#VOLUME /data
+#WORKDIR /data
+
+VOLUME /home/snapcast/.config/snapserver
+VOLUME /var/cache/snapcast
+
+COPY entrypoint.sh /
+ENTRYPOINT ["/entrypoint.sh"]

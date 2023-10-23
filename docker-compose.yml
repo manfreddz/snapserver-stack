@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  snapcast:
+    build: build
+    network_mode: host
+    restart: always
+    volumes:
+      - "./config/:/home/snapcast/.config/snapserver/:rw"
+      - "./snapserver.conf:/etc/snapserver.conf:ro"
+      - "snapservercache:/var/cache/snapcast"
+      - "/var/run/dbus:/var/run/dbus"
+      - "/var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket"
+
+volumes:
+  snapservercache:

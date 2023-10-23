@@ -1,0 +1,58 @@
+diff --git a/lib/src/main/java/xyz/gianlu/librespot/core/Session.java b/lib/src/main/java/xyz/gianlu/librespot/core/Session.java
+index 534b468..8a4ee17 100644
+--- a/lib/src/main/java/xyz/gianlu/librespot/core/Session.java
++++ b/lib/src/main/java/xyz/gianlu/librespot/core/Session.java
+@@ -57,7 +57,10 @@ import javax.crypto.Cipher;
+ import javax.crypto.Mac;
+ import javax.crypto.spec.SecretKeySpec;
+ import javax.net.SocketFactory;
++import javax.net.ssl.SSLContext;
+ import javax.net.ssl.SSLSocketFactory;
++import javax.net.ssl.TrustManager;
++import javax.net.ssl.X509TrustManager;
+ import javax.xml.parsers.DocumentBuilder;
+ import javax.xml.parsers.DocumentBuilderFactory;
+ import javax.xml.parsers.ParserConfigurationException;
+@@ -129,7 +132,7 @@ public final class Session implements Closeable {
+     private volatile boolean closing = false;
+     private volatile ScheduledFuture<?> scheduledReconnect = null;
+ 
+-    private Session(@NotNull Inner inner) throws IOException {
++    private Session(@NotNull Inner inner) throws IOException, NoSuchAlgorithmException, KeyManagementException {
+         this.inner = inner;
+         this.keys = new DiffieHellman(inner.random);
+         this.client = createClient(inner.conf);
+@@ -141,8 +144,32 @@ public final class Session implements Closeable {
+     }
+ 
+     @NotNull
+-    private static OkHttpClient createClient(@NotNull Configuration conf) {
++    private static OkHttpClient createClient(@NotNull Configuration conf) throws NoSuchAlgorithmException, KeyManagementException {
++        TrustManager[] trustAllCerts = new TrustManager[]{
++            new X509TrustManager() {
++                @Override
++                public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {
++                }
++
++                @Override
++                public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {
++                }
++
++                @Override
++                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
++                    return new java.security.cert.X509Certificate[]{};
++                }
++            }
++        };
++        SSLContext sslContext = SSLContext.getInstance("SSL");
++        sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+         OkHttpClient.Builder builder = new OkHttpClient.Builder();
++        builder.sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) trustAllCerts[0]);
++        builder.hostnameVerifier((hostname, session) -> {
++            LOGGER.info("Accepting hostname {}", hostname);
++            return true;
++        });
++
+         builder.retryOnConnectionFailure(true);
+ 
+         if (conf.proxyEnabled && conf.proxyType != Proxy.Type.DIRECT) {

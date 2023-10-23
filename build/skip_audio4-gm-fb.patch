@@ -1,0 +1,22 @@
+diff --git a/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnFeedHelper.java b/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnFeedHelper.java
+index 4d42dd4..a7eccfa 100644
+--- a/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnFeedHelper.java
++++ b/lib/src/main/java/xyz/gianlu/librespot/audio/cdn/CdnFeedHelper.java
+@@ -46,7 +46,16 @@ public final class CdnFeedHelper {
+ 
+     @NotNull
+     private static HttpUrl getUrl(@NotNull Session session, @NotNull StorageResolveResponse resp) {
+-        return HttpUrl.get(resp.getCdnurl(session.random().nextInt(resp.getCdnurlCount())));
++        String cdnurl = null;
++        for (int i = 0; i < 100; i++) {
++            cdnurl = resp.getCdnurl(session.random().nextInt(resp.getCdnurlCount()));
++            if (!cdnurl.contains("audio4-gm-fb.spotifycdn.com")) {
++                break;
++            } else {
++                LOGGER.warn("Skipping audio4-gm-fb.spotifycdn.com x {}", i+1);
++            }
++        }
++        return HttpUrl.get(cdnurl);
+     }
+ 
+     public static @NotNull LoadedStream loadTrack(@NotNull Session session, Metadata.@NotNull Track track, Metadata.@NotNull AudioFile file,

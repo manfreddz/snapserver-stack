@@ -1,0 +1,109 @@
+FROM ubuntu:22.04 AS librespot-builder
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    alsa-utils \
+    avahi-daemon \
+    build-essential \
+    git \
+    libasio-dev \
+    libasound2-dev \
+    libavahi-client-dev \
+    libexpat1-dev \
+    libflac-dev \
+    libopus-dev \
+    libpulse-dev \
+    libsoxr-dev \
+    libvorbisidec-dev \
+    libvorbis-dev \
+    curl \
+    build-essential \
+    git \
+    libasound2-dev \
+    pkg-config \
+    portaudio19-dev \
+    libpulse-dev \
+    libjack-dev \
+    libsdl2-dev \
+    cargo \
+    maven \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Speeds up repeated builds
+RUN git clone --depth 1 https://github.com/librespot-org/librespot.git /tmp/librespot-tmp && cd /tmp/librespot-tmp && cargo fetch
+# Doesn't work for some reason RUN git clone --depth 1 https://github.com/librespot-org/librespot-java.git /tmp/lsj && cd /tmp/lsj && mvn dependency:go-offline
+RUN git clone --depth 1 https://github.com/librespot-org/librespot-java.git /tmp/lsj && cd /tmp/lsj && mvn compile
+
+WORKDIR /code
+
+ARG LIBRESPOT_VERSION=0.4.1
+COPY build_librespot.sh /
+RUN /build_librespot.sh ${LIBRESPOT_VERSION}
+
+ARG LIBRESPOT_JAVA_VERSION=1.6.3
+COPY build_librespot-java.sh /
+RUN /build_librespot-java.sh ${LIBRESPOT_JAVA_VERSION}
+
+ARG SNAPCAST_VERSION=0.27.0
+COPY build_snapcast.sh /
+RUN /build_snapcast.sh ${SNAPCAST_VERSION}
+
+
+FROM ubuntu:22.04
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    libvorbis0a libvorbisenc2 \
+    libflac8 \
+    libopus0 \
+    libsoxr0 \
+    libasound2 \
+    libavahi-client3 \
+    libpulse0 \
+    nano \
+    less \
+    openjdk-17-jre-headless \
+    python3 python3-pip \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install websocket-client requests
+
+# Install librespot
+COPY --from=builder /code/librespot-code/target/release/librespot /usr/local/bin/
+
+# Install librespot-java
+COPY --from=builder /librespot-player.jar /librespot-player.jar
+COPY librespot-player.sh /librespot-player.sh
+
+# Install snapcast
+COPY --from=builder /code/snapcast/server/snapserver /usr/bin/snapserver
+COPY --from=builder /code/snapcast/client/snapclient /usr/bin/snapclient
+COPY --from=builder /code/snapcast/server/etc/snapweb /usr/share/snapserver/snapweb
+
+RUN useradd --system --uid 666 -M --shell /usr/sbin/nologin snapcast && \
+    mkdir -p /home/snapcast/.config && \
+    chown snapcast:snapcast -R /home
+
+RUN mkdir -p /var/cache/snapcast/librespot && \
+    chown -R snapcast /var/cache/snapcast
+
+COPY config.toml /config.toml
+RUN chown 666:666 /config.toml
+
+USER snapcast
+
+EXPOSE 1704
+EXPOSE 1705
+
+#VOLUME /data
+#WORKDIR /data
+
+VOLUME /home/snapcast/.config/snapserver
+VOLUME /var/cache/snapcast
+
+COPY entrypoint.sh /
+ENTRYPOINT ["/entrypoint.sh"]
