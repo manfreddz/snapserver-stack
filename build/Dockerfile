@@ -41,9 +41,9 @@ ARG LIBRESPOT_JAVA_VERSION=1.6.3
 #COPY build_librespot-java.sh /
 #RUN /build_librespot-java.sh ${LIBRESPOT_JAVA_VERSION}
 
-RUN wget "https://github.com/librespot-org/librespot-java/releases/download/v${LIBRESPOT_JAVA_VERSION}/librespot-player-${LIBRESPOT_JAVA_VERSION}.jar"
-RUN wget "https://github.com/librespot-org/librespot-java/releases/download/v${LIBRESPOT_JAVA_VERSION}/librespot-api-${LIBRESPOT_JAVA_VERSION}.jar"
-RUN mv librespot-player-${LIBRESPOT_JAVA_VERSION}.jar /librespot-player.jar
+#RUN wget "https://github.com/librespot-org/librespot-java/releases/download/v${LIBRESPOT_JAVA_VERSION}/librespot-player-${LIBRESPOT_JAVA_VERSION}.jar"
+#RUN wget "https://github.com/librespot-org/librespot-java/releases/download/v${LIBRESPOT_JAVA_VERSION}/librespot-api-${LIBRESPOT_JAVA_VERSION}.jar"
+#RUN mv librespot-player-${LIBRESPOT_JAVA_VERSION}.jar /librespot-player.jar
 
 RUN git clone --depth 1 --branch "v${LIBRESPOT_JAVA_VERSION}" https://github.com/librespot-org/librespot-java.git
 WORKDIR librespot-java
@@ -51,6 +51,8 @@ RUN sed -i 's/<Console name="console" target="SYSTEM_OUT">/<Console name="consol
 RUN sed -i 's/<Console name="console" target="SYSTEM_OUT">/<Console name="console" target="SYSTEM_ERR">/' lib/src/main/resources/log4j2.xml
 #RUN sed -i 's/if (output.setVolume(volumeNorm)) mixing.setGlobalGain(1);/volumeNorm = (float) Math.pow(volumeNorm, 3) \/ 2;\n        if (output.setVolume(volumeNorm)) mixing.setGlobalGain(1);/' player/src/main/java/xyz/gianlu/librespot/player/mixing/AudioSink.java
 RUN sed -i 's/if (output.setVolume(volumeNorm)) mixing.setGlobalGain(1);/volumeNorm = (float) Math.pow(volumeNorm, 3);\n        if (output.setVolume(volumeNorm)) mixing.setGlobalGain(1);/' player/src/main/java/xyz/gianlu/librespot/player/mixing/AudioSink.java
+
+RUN cat player/src/main/java/xyz/gianlu/librespot/player/mixing/AudioSink.java api/src/main/resources/log4j2.xml lib/src/main/resources/log4j2.xml
 
 #COPY allcerts.patch /
 #RUN git apply /allcerts.patch
@@ -78,7 +80,7 @@ WORKDIR /code
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
     git \
-    make \
+    cmake \
     g++ \
     libboost-all-dev \
     libasound2-dev libpulse-dev libvorbisidec-dev libvorbis-dev libopus-dev libflac-dev libsoxr-dev alsa-utils libavahi-client-dev avahi-daemon libexpat1-dev \
@@ -86,17 +88,37 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG SNAPCAST_VERSION=0.27.0
+ARG SNAPCAST_VERSION=0.28.0
 #COPY build_snapcast.sh /
 #RUN /build_snapcast.sh ${SNAPCAST_VERSION}
 
 RUN git clone --branch v${SNAPCAST_VERSION} --depth 1 https://github.com/badaix/snapcast.git snapcast
 WORKDIR snapcast
+RUN mkdir -p build
 RUN git status
-RUN make
+RUN cd build && cmake .. && cmake --build .
 
 RUN find . -type f
 
+
+# Build snapweb
+FROM ubuntu:22.04 AS snapweb-builder
+
+WORKDIR /code
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    wget unzip \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG SNAPWEB_VERSION=0.7.0
+
+WORKDIR /code/snapweb
+RUN wget https://github.com/badaix/snapweb/releases/download/v${SNAPWEB_VERSION}/snapweb.zip
+RUN unzip snapweb.zip
+RUN rm snapweb.zip
 
 
 # Build actual image
@@ -129,9 +151,12 @@ COPY --from=librespot-java-builder /librespot-player.jar /librespot-player.jar
 COPY librespot-player.sh /librespot-player.sh
 
 # Install snapcast
-COPY --from=snapcast-builder /code/snapcast/server/snapserver /usr/bin/snapserver
-COPY --from=snapcast-builder /code/snapcast/client/snapclient /usr/bin/snapclient
+COPY --from=snapcast-builder /code/snapcast/bin/snapserver /usr/bin/snapserver
+COPY --from=snapcast-builder /code/snapcast/bin/snapclient /usr/bin/snapclient
 COPY --from=snapcast-builder /code/snapcast/server/etc/snapweb /usr/share/snapserver/snapweb
+
+# Install snapweb
+COPY --from=snapweb-builder /code/snapweb/ /usr/share/snapserver/snapweb/
 
 RUN useradd --system --uid 666 -M --shell /usr/sbin/nologin snapcast && \
     mkdir -p /home/snapcast/.config && \
