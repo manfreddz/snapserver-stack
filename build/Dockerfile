@@ -13,7 +13,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG LIBRESPOT_VERSION=0.4.1
+ARG LIBRESPOT_VERSION=0.5.0
 #COPY build_librespot.sh /
 #RUN /build_librespot.sh ${LIBRESPOT_VERSION}
 
@@ -88,7 +88,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG SNAPCAST_VERSION=0.28.0
+ARG SNAPCAST_VERSION=0.29.0
 #COPY build_snapcast.sh /
 #RUN /build_snapcast.sh ${SNAPCAST_VERSION}
 
@@ -113,7 +113,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG SNAPWEB_VERSION=0.7.0
+ARG SNAPWEB_VERSION=0.8.0
 
 WORKDIR /code/snapweb
 RUN wget https://github.com/badaix/snapweb/releases/download/v${SNAPWEB_VERSION}/snapweb.zip
