@@ -13,7 +13,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG LIBRESPOT_VERSION=0.5.0
+ARG LIBRESPOT_VERSION=0.6.0
 #COPY build_librespot.sh /
 #RUN /build_librespot.sh ${LIBRESPOT_VERSION}
 
