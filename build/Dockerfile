@@ -12,6 +12,9 @@ RUN git clone --branch v${GO_LIBRESPOT_VERSION} --depth 1 https://github.com/dev
 WORKDIR go-librespot-code
 RUN git status
 
+# Cubic volume control
+RUN sed -i 's/volume := out.volume \* out.volume/volume := out.volume \* out.volume \* out.volume/' output/driver-pipe.go
+
 RUN /usr/lib/go-1.23/bin/go mod download
 
 RUN /usr/lib/go-1.23/bin/go build -v ./cmd/daemon
