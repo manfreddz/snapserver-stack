@@ -1,3 +1,22 @@
+# Build go-librespot
+FROM ubuntu:22.04 AS go-librespot-builder
+
+ARG GO_LIBRESPOT_VERSION=0.2.0
+
+WORKDIR /code
+
+RUN apt-get update && apt-get install -y golang-1.23-go libogg-dev libvorbis-dev libasound2-dev git
+
+RUN git clone --branch v${GO_LIBRESPOT_VERSION} --depth 1 https://github.com/devgianlu/go-librespot.git go-librespot-code
+
+WORKDIR go-librespot-code
+RUN git status
+
+RUN /usr/lib/go-1.23/bin/go mod download
+
+RUN /usr/lib/go-1.23/bin/go build -v ./cmd/daemon
+
+
 # Build librespot
 FROM ubuntu:22.04 AS librespot-builder
 
@@ -143,6 +162,9 @@ RUN apt-get update && \
 
 RUN pip3 install websocket-client requests
 
+# Install go-librespot
+COPY --from=go-librespot-builder /code/go-librespot-code/daemon /usr/local/bin/go-librespot
+
 # Install librespot
 COPY --from=librespot-builder /code/librespot-code/target/release/librespot /usr/local/bin/
 
@@ -161,6 +183,11 @@ COPY --from=snapweb-builder /code/snapweb/ /usr/share/snapserver/snapweb/
 RUN useradd --system --uid 666 -M --shell /usr/sbin/nologin snapcast && \
     mkdir -p /home/snapcast/.config && \
     chown snapcast:snapcast -R /home
+
+RUN mkdir -p /go-librespot1 /go-librespot2
+COPY go-librespot-config1.yml /go-librespot1/config.yml
+COPY go-librespot-config2.yml /go-librespot2/config.yml
+RUN chown -R snapcast /go-librespot1 /go-librespot2
 
 RUN mkdir -p /var/cache/snapcast/librespot && \
     chown -R snapcast /var/cache/snapcast
