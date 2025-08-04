@@ -105,12 +105,12 @@ RUN apt-get update && \
     cmake \
     g++ \
     libboost-all-dev \
-    libasound2-dev libpulse-dev libvorbisidec-dev libvorbis-dev libopus-dev libflac-dev libsoxr-dev alsa-utils libavahi-client-dev avahi-daemon libexpat1-dev \
+    libasound2-dev libpulse-dev libvorbisidec-dev libvorbis-dev libopus-dev libflac-dev libsoxr-dev alsa-utils libavahi-client-dev avahi-daemon libexpat1-dev libssl-dev \
     && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG SNAPCAST_VERSION=0.29.0
+ARG SNAPCAST_VERSION=0.31.0
 #COPY build_snapcast.sh /
 #RUN /build_snapcast.sh ${SNAPCAST_VERSION}
 
@@ -187,10 +187,11 @@ RUN useradd --system --uid 666 -M --shell /usr/sbin/nologin snapcast && \
     mkdir -p /home/snapcast/.config && \
     chown snapcast:snapcast -R /home
 
-RUN mkdir -p /go-librespot1 /go-librespot2
+RUN mkdir -p /go-librespot{1,2,3}
 COPY go-librespot-config1.yml /go-librespot1/config.yml
 COPY go-librespot-config2.yml /go-librespot2/config.yml
-RUN chown -R snapcast /go-librespot1 /go-librespot2
+COPY go-librespot-config3.yml /go-librespot3/config.yml
+RUN chown -R snapcast /go-librespot*
 
 RUN mkdir -p /var/cache/snapcast/librespot && \
     chown -R snapcast /var/cache/snapcast

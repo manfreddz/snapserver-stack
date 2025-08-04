@@ -1,8 +1,7 @@
 zeroconf_enabled: false # Whether to keep the device discoverable at all times, even if authenticated via other >
 zeroconf_port: 0 # The port to use for Zeroconf, 0 for random
-device_id: 'a88a47d993b8af4e3314d13ad0c0961742fe8e0a'
-#2f0d4c209eeaaaa4b99f8e40173fc6d94197e449' # Spotify device ID (auto-generated)
-device_name: 'Snapcast-go 2' # Spotify device name
+device_id: '49d2cde797b34fca31a510846c7443fd3c6759e7' # Spotify device ID (auto-generated)
+device_name: 'Snapcast-go 3' # Spotify device name
 device_type: computer # Spotify device type (icon)
 audio_backend: pipe # Audio backend to use (alsa, pipe, pulseaudio)
 audio_output_pipe: '/dev/stdout' # Path to a named pipe for audio output
