@@ -1,11 +1,11 @@
 # Build go-librespot
 FROM ubuntu:22.04 AS go-librespot-builder
 
-ARG GO_LIBRESPOT_VERSION=0.2.0
-
 WORKDIR /code
 
 RUN apt-get update && apt-get install -y golang-1.23-go libogg-dev libvorbis-dev libasound2-dev git
+
+ARG GO_LIBRESPOT_VERSION=0.4.0
 
 RUN git clone --branch v${GO_LIBRESPOT_VERSION} --depth 1 https://github.com/devgianlu/go-librespot.git go-librespot-code
 
@@ -36,8 +36,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ARG LIBRESPOT_VERSION=0.6.0
-#COPY build_librespot.sh /
-#RUN /build_librespot.sh ${LIBRESPOT_VERSION}
 
 RUN git clone --branch v${LIBRESPOT_VERSION} --depth 1 https://github.com/librespot-org/librespot.git librespot-code
 WORKDIR librespot-code
@@ -60,8 +58,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ARG LIBRESPOT_JAVA_VERSION=1.6.3
-#COPY build_librespot-java.sh /
-#RUN /build_librespot-java.sh ${LIBRESPOT_JAVA_VERSION}
 
 #RUN wget "https://github.com/librespot-org/librespot-java/releases/download/v${LIBRESPOT_JAVA_VERSION}/librespot-player-${LIBRESPOT_JAVA_VERSION}.jar"
 #RUN wget "https://github.com/librespot-org/librespot-java/releases/download/v${LIBRESPOT_JAVA_VERSION}/librespot-api-${LIBRESPOT_JAVA_VERSION}.jar"
