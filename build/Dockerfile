@@ -5,7 +5,7 @@ WORKDIR /code
 
 RUN apt-get update && apt-get install -y golang-1.23-go libogg-dev libvorbis-dev libasound2-dev git
 
-ARG GO_LIBRESPOT_VERSION=0.4.0
+ARG GO_LIBRESPOT_VERSION=0.5.0
 
 RUN git clone --branch v${GO_LIBRESPOT_VERSION} --depth 1 https://github.com/devgianlu/go-librespot.git go-librespot-code
 
@@ -106,7 +106,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG SNAPCAST_VERSION=0.31.0
+ARG SNAPCAST_VERSION=0.34.0
 #COPY build_snapcast.sh /
 #RUN /build_snapcast.sh ${SNAPCAST_VERSION}
 
@@ -131,7 +131,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG SNAPWEB_VERSION=0.8.0
+ARG SNAPWEB_VERSION=0.9.2
 
 WORKDIR /code/snapweb
 RUN wget https://github.com/badaix/snapweb/releases/download/v${SNAPWEB_VERSION}/snapweb.zip
